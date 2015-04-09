@@ -3,6 +3,28 @@
 
 ## Functions 
 
+function GetLargestDStore {
+
+	#Get's a list of datastores and excludes based on matches of "Name1" etc. Only gets free space and datastore Name
+	$datastores = get-datastore | where {$_.Name -notmatch "Name1|Name2|Name3"} | select Name,FreeSpaceMB
+
+	#Sets some static info
+	$LargestFreeSpace = "0"
+	$LargestDatastore = $null
+
+	#Performs the calculation of which datastore has most free space
+	foreach ($datastore in $datastores) {
+		if ($Datastore.FreeSpaceMB -gt $LargestFreeSpace) {	
+				$LargestFreeSpace = $Datastore.FreeSpaceMB
+				$LargestDatastore = $Datastore.name
+		}
+	}
+
+#Writes out the result to the PowerShell Console		
+	write-host "$LargestDatastore is the largest store with $LargestFreeSpace MB Free"
+	return $LargestDatastore
+}
+
 function PowerONDevices {
 
 	param ($devices)
@@ -87,24 +109,29 @@ Write-Host "Successfully created your folder: $EnvFolder`n"
 
 
 
-
-
 ## Define VM Names and Templates to Use
 $SensorName = ($SensorTemplate = Get-Template -Name _TEMPLATE_-nacsnsr-4.3) -replace "_TEMPLATE_", "$Owner-$ID"
 $CMName = ($CMTemplate = Get-Template -Name _TEMPLATE_-naccm-4.3) -replace "_TEMPLATE_", "$Owner-$ID"
 $WinCientName = ($WinTemplate = Get-Template -Name _TEMPLATE_-win7-x64-client) -replace "_TEMPLATE_", "$Owner-$ID"
 $RouterName = ($RouterTemplate = Get-Template -Name _TEMPLATE_-centos64_x64-router) -replace "_TEMPLATE_", "$Owner-$ID"
 
+# Authentication Servers 
+$DomainControllerName = ($DomainControllerTemplate = Get-Template -Name _TEMPLATE_-WindowsServer2012_R2_x64-Auther) -replace "_TEMPLATE_", "$Owner-$ID"
 
 ## Create the VMs
+Write-Host "Identifying largest datastore..."
+$Datastore = GetLargestDStore
 Write-Host "Creating Your VMs...`n"
-$Sensor = New-VM -VMHost $VMHost -Name $SensorName -Template $SensorTemplate -Location $EnvFolder
-$CM = New-VM -VMHost $VMHost -Name $CMName -Template $CMTemplate -Location $EnvFolder
-$WinClient = New-VM -VMHost $VMHost -Name $WinCientName -Template $WinTemplate -Location $EnvFolder
-$Router = New-VM -VMHost $VMHost -Name $RouterName -Template $RouterTemplate -Location $EnvFolder
-$vms = $Sensor, $CM, $WinClient, $Router
+$Sensor = New-VM -VMHost $VMHost -Name $SensorName -Template $SensorTemplate -Location $EnvFolder -Datastore $Datastore
+
+$CM = New-VM -VMHost $VMHost -Name $CMName -Template $CMTemplate -Location $EnvFolder -Datastore $Datastore
+$WinClient = New-VM -VMHost $VMHost -Name $WinCientName -Template $WinTemplate -Location $EnvFolder -Datastore $Datastore
+$Router = New-VM -VMHost $VMHost -Name $RouterName -Template $RouterTemplate -Location $EnvFolder -Datastore $Datastore
+$DomainController = New-VM -VMHost $VMHost -Name $DomainControllerName -Template $DomainControllerTemplate -Location $EnvFolder -Datastore $Datastore
+$vms = $Sensor, $CM, $WinClient, $Router, $DomainController
 
 Write-Host "VMs successfully created."
+ 
 
 ## Initialize Device Network Adapters
 Write-Host "Initializing Device Network Adapters...`n"
@@ -119,6 +146,8 @@ $RouterMgmtAdapter = Get-NetworkAdapter -VM $Router -Name "Network adapter 2"
 $RouterIntAdapter = Get-NetworkAdapter -VM $Router -Name "Network adapter 3"
 
 $WinClientAdapter = Get-NetworkAdapter -VM $WinClient -Name "Network adapter 1"
+
+$DomainControllerAdapter = Get-NetworkAdapter -VM $DomainController -Name "Network adapter 1"
 
 Write-Host "Adapters successfully initialized.`n"
 
@@ -139,12 +168,13 @@ foreach ($HoldAdapter in $HoldAdapters){
 		$OpenMgmtPortgroup = Get-VDPortgroup -Name "Test-Env-Mgmt-$GroupID"
 		$OpenIntPortgroup = Get-VDPortgroup -Name "Test-Env-Intra-$GroupID"		
 		
-		Write-Host "Configuring device network adapters...`n"
+		Write-Host "Configuring device network adapters:`n"
 		
-		# Move hold-vm's adapter off of held portgroup to the hold portgroup
+		# Move hold-vm's adapter off of held portgroup to the hold portgroup		
 		Set-NetworkAdapter -NetworkAdapter $HoldAdapter -PortGroup $HoldPortgroup
+	
 		
-		# Move sensors monitor interface to the mirroring portgroup
+		# Move sensors monitor interface to the mirroring portgroup		
 		Set-NetworkAdapter -NetworkAdapter $SensorMonAdapter -PortGroup $OpenPortgroup -Confirm:$False
 	
 		# Move all devices management network interfaces to the corresponding port group
@@ -156,6 +186,8 @@ foreach ($HoldAdapter in $HoldAdapters){
 		Set-NetworkAdapter -NetworkAdapter $RouterWANAdapter -PortGroup $WANPortgroup -Confirm:$False
 		Set-NetworkAdapter -NetworkAdapter $RouterMgmtAdapter -PortGroup $OpenMgmtPortgroup -Confirm:$False
 		Set-NetworkAdapter -NetworkAdapter $RouterIntAdapter -PortGroup $OpenIntPortgroup -Confirm:$False
+		
+		Set-NetworkAdapter -NetworkAdapter $DomainControllerAdapter -PortGroup $OpenMgmtPortgroup -Confirm:$False
 		
 		Set-NetworkAdapter -NetworkAdapter $WinClientAdapter -PortGroup $OpenIntPortgroup -Confirm:$False
 		
