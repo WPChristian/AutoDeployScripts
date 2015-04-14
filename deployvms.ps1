@@ -78,8 +78,11 @@ Write-Host -NoNewline "Connecting to VSphere Server...`n"
 #    exit 2
 #}
 #else{
-#   Write-Host "Successfully connected to server.`n"
+   Write-Host "Successfully connected to server.`n"
 #}
+
+
+
 
 ## Define the variables to use
 $VMHost = Get-VMHost -Name vms-dev-ast-06.trustwave.com
@@ -94,8 +97,17 @@ $WANPortgroup = Get-VDPortgroup -Name "Switch-Holder"
 $Switchholder = Get-VM -Name Switch-Holder
 $HoldAdapters = Get-NetworkAdapter -VM $Switchholder
 
-## Get the user's name and create a unique ID
+# Get the user's name and create a unique ID
 $Owner = Read-Host "Please enter your first initial and last name without spaces"
+
+# Set the amount of clients to deploy
+
+$MaxDevices = 5
+[int]$Win7Count = Read-Host "Please enter the number of Windows 7 clients to deploy"
+
+while($Win7Count -gt $MaxDevices){ 
+	[int]$Win7Count = Read-Host "Please enter a number less than $MaxDevices"
+}
 
 $ID = Get-Random -Minimum 99 -Maximum 999
 
@@ -123,15 +135,24 @@ Write-Host "Identifying largest datastore..."
 $Datastore = GetLargestDStore
 Write-Host "Creating Your VMs...`n"
 $Sensor = New-VM -VMHost $VMHost -Name $SensorName -Template $SensorTemplate -Location $EnvFolder -Datastore $Datastore
-
+$Datastore = GetLargestDStore
 $CM = New-VM -VMHost $VMHost -Name $CMName -Template $CMTemplate -Location $EnvFolder -Datastore $Datastore
-$WinClient = New-VM -VMHost $VMHost -Name $WinCientName -Template $WinTemplate -Location $EnvFolder -Datastore $Datastore
+
+$WinClients = @()
+for ($i=1; $i -le $Win7Count; $i++) {
+	$Datastore = GetLargestDStore
+	$WinClient = New-VM -VMHost $VMHost -Name "$WinCientName-$i" -Template $WinTemplate -Location $EnvFolder -Datastore $Datastore
+	$WinClients += $WinClient
+}
+$Datastore = GetLargestDStore
 $Router = New-VM -VMHost $VMHost -Name $RouterName -Template $RouterTemplate -Location $EnvFolder -Datastore $Datastore
+$Datastore = GetLargestDStore
 $DomainController = New-VM -VMHost $VMHost -Name $DomainControllerName -Template $DomainControllerTemplate -Location $EnvFolder -Datastore $Datastore
-$vms = $Sensor, $CM, $WinClient, $Router, $DomainController
+$vms = $Sensor, $CM, $WinClients, $Router, $DomainController
 
 Write-Host "VMs successfully created."
  
+
 
 ## Initialize Device Network Adapters
 Write-Host "Initializing Device Network Adapters...`n"
@@ -153,6 +174,8 @@ Write-Host "Adapters successfully initialized.`n"
 
 ## Identify Available PortGroups 
 Write-Host "Identifying available mirroring port.`n"
+
+## This needs to be optimized. Preferably by moving everything after line 189 out of the loop.
 foreach ($HoldAdapter in $HoldAdapters){
 	
 	
@@ -198,7 +221,10 @@ foreach ($HoldAdapter in $HoldAdapters){
 		break
 		
 	}
+
 }
+
+## Need to add message if there are no mirroring ports are available.
 
 
 Write-Host "Disconnecting from server..."
