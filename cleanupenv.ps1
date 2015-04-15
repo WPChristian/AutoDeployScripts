@@ -4,17 +4,21 @@ Write-Host "`n`n!! WARNING: Please use extreme caution while using this tool. It
 Remember, with great power comes great derpability...`n"
 
 $FolderName = Read-Host "Please enter the folder name of the VM's that you wish to delete"
+$Folder = Get-Folder -Name $FolderName
+$VMS = $Folder | Get-VM 
+$Sensor = Get-VM -Name "$FoldeName-nacsnsr*"
+$Switchholder = Get-VM -Name Switch-Holder
+$HoldAdapters = Get-NetworkAdapter -VM $Switchholder
 
-$VMS = Get-VM -Name "$FolderName*"
 
-$Prompt = Write-Host "These are the VMs that you will be deleting: `n"
+Write-Host "These are the VMs that you will be deleting: `n"
 
 foreach ($VM in $VMS) {
     
     Write-Host "$VM"
 
 }
- 
+
 $question = "`nARE YOU SURE THESE ARE THE VMs THAT YOU WANT TO DELETE?"
 
 $choices = New-Object Collections.ObjectModel.Collection[Management.Automation.Host.ChoiceDescription]
@@ -23,9 +27,17 @@ $choices.Add((New-Object Management.Automation.Host.ChoiceDescription -ArgumentL
 
 $decision = $Host.UI.PromptForChoice($message, $question, $choices, 1)
 if ($decision -eq 0) {
-  Remove-VM $VMS -Deletepermanently
+    Remove-Folder $Folder -Deletepermanently
+    $Adapters = Get-NetworkAdapter $Sensor
+    $SensorMon = $Adapters[1].NetworkName
+    $HoldMonId = $SensorMon -replace "Test-Env-MonSess-0", ""
+    $MonPortGroup = Get-VDPortGroup -Name $SensorMon
+    Write-Host "Releasing Mirroring Port..."
+    Set-NetworkAdapter -NetworkAdapter $HoldAdapters[$HoldMonId] -PortGroup $MonPortGroup -Confirm:$False
+    Write-Host "Success!"
+
 } else {
-  Write-Host 'Not deleting VMs.'
+  Write-Host "`nNot deleting VMs."
 }
 
 Write-Host "`nDONE."
