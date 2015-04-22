@@ -148,7 +148,8 @@ $Datastore = GetLargestDStore
 $Router = New-VM -VMHost $VMHost -Name $RouterName -Template $RouterTemplate -Location $EnvFolder -Datastore $Datastore
 $Datastore = GetLargestDStore
 $DomainController = New-VM -VMHost $VMHost -Name $DomainControllerName -Template $DomainControllerTemplate -Location $EnvFolder -Datastore $Datastore
-$vms = $Sensor, $CM, $WinClients, $Router, $DomainController
+$vms = $Router, $Sensor, $CM, $DomainController
+$vms += $WinClients
 
 Write-Host "VMs successfully created."
  
@@ -216,7 +217,21 @@ foreach ($HoldAdapter in $HoldAdapters){
 		
 		Write-Host "Network adapters successfully configured.`n"
 		
-		PowerONDevices ($vms)
+		Start-VM $vms
+
+		Write-Host "Your environment's folder name is: $EnvFolder"
+
+		$RouterIP = 0
+
+		while ($RouterIP = 0 ){
+			$RouterIP = [string]$Router.guest.IPAddress[0]
+			Write-Host "Your gateway device is located at: " 
+			Write-Host $RouterIP
+			Write-Host "CM Address is at: http://" $RouterIP
+			Write-Host "SSH connectivity to gateway router is at: " $RouterIP ":22"
+			Write-Host "SSH connectivity to CM is at: " $RouterIP ":23"
+			Write-Host "SSH connectivity to Sensor is at: " $RouterIP ":24"
+		}
 		
 		break
 		
@@ -227,8 +242,4 @@ foreach ($HoldAdapter in $HoldAdapters){
 ## Need to add message if there are no mirroring ports are available.
 
 
-Write-Host "Disconnecting from server..."
-
 Disconnect-VIServer -Server $VCenterHost
-
-Write-Host "Successfully disconnected."
