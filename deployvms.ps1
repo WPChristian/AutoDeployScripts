@@ -138,18 +138,23 @@ $Sensor = New-VM -VMHost $VMHost -Name $SensorName -Template $SensorTemplate -Lo
 $Datastore = GetLargestDStore
 $CM = New-VM -VMHost $VMHost -Name $CMName -Template $CMTemplate -Location $EnvFolder -Datastore $Datastore
 
-$WinClients = @()
-for ($i=1; $i -le $Win7Count; $i++) {
-	$Datastore = GetLargestDStore
-	$WinClient = New-VM -VMHost $VMHost -Name "$WinCientName-$i" -Template $WinTemplate -Location $EnvFolder -Datastore $Datastore
-	$WinClients += $WinClient
-}
+
 $Datastore = GetLargestDStore
 $Router = New-VM -VMHost $VMHost -Name $RouterName -Template $RouterTemplate -Location $EnvFolder -Datastore $Datastore
 $Datastore = GetLargestDStore
 $DomainController = New-VM -VMHost $VMHost -Name $DomainControllerName -Template $DomainControllerTemplate -Location $EnvFolder -Datastore $Datastore
 $vms = $Router, $Sensor, $CM, $DomainController
-$vms += $WinClients
+
+if ($Win7Count -ne 0){
+	$WinClients = @()
+	for ($i=1; $i -le $Win7Count; $i++) {
+		$Datastore = GetLargestDStore
+		$WinClient = New-VM -VMHost $VMHost -Name "$WinCientName-$i" -Template $WinTemplate -Location $EnvFolder -Datastore $Datastore
+		$WinClients += $WinClient
+	}
+	$vms += $WinClients
+	$WinClientAdapters = @()
+}
 
 Write-Host "VMs successfully created."
  
@@ -167,7 +172,13 @@ $RouterWANAdapter = Get-NetworkAdapter -VM $Router -Name "Network adapter 1"
 $RouterMgmtAdapter = Get-NetworkAdapter -VM $Router -Name "Network adapter 2"
 $RouterIntAdapter = Get-NetworkAdapter -VM $Router -Name "Network adapter 3"
 
-$WinClientAdapter = Get-NetworkAdapter -VM $WinClient -Name "Network adapter 1"
+if ($WinClients -ne $null){
+	foreach ($WinClient in $WinClients){
+
+		$WinClientAdapter = Get-NetworkAdapter -VM $WinClient -Name "Network adapter 1"
+		$WinClientAdapters += $WinClientAdapter
+	}
+}
 
 $DomainControllerAdapter = Get-NetworkAdapter -VM $DomainController -Name "Network adapter 1"
 
@@ -176,7 +187,9 @@ Write-Host "Adapters successfully initialized.`n"
 ## Identify Available PortGroups 
 Write-Host "Identifying available mirroring port.`n"
 
-## This needs to be optimized. Preferably by moving everything after line 189 out of the loop.
+## This needs to be optimized. Preferably by moving everything after line 189 out of the loop. Also needs to be placed in a way that the VM's won't
+## get created unless there's an available monitoring adapter. 
+
 foreach ($HoldAdapter in $HoldAdapters){
 	
 	
@@ -184,6 +197,7 @@ foreach ($HoldAdapter in $HoldAdapters){
 	if ($HoldAdapter.NetworkName -match "Test-Env-MonSess"){
 	
 		Write-Host "Available mirroring port found.`n"
+		$Mirror = $true
 		
 		$OpenPortgroup = Get-VDPortgroup -Name $HoldAdapter.NetworkName
 		$GroupID = $HoldAdapter.NetworkName -replace "Test-Env-MonSess-", ""
@@ -213,8 +227,14 @@ foreach ($HoldAdapter in $HoldAdapters){
 		
 		Set-NetworkAdapter -NetworkAdapter $DomainControllerAdapter -PortGroup $OpenMgmtPortgroup -Confirm:$False
 		
-		Set-NetworkAdapter -NetworkAdapter $WinClientAdapter -PortGroup $OpenIntPortgroup -Confirm:$False
-		
+		if ($WinClientAdapters -ne $null){
+
+			foreach ($WinClientAdapter in $WinClientAdapters) {
+
+				Set-NetworkAdapter -NetworkAdapter $WinClientAdapter -PortGroup $OpenIntPortgroup -Confirm:$False
+			}
+		}
+
 		Write-Host "Network adapters successfully configured.`n"
 		
 		Start-VM $vms
@@ -235,8 +255,13 @@ foreach ($HoldAdapter in $HoldAdapters){
 		
 		break
 		
-	}
+	} 
 
+}
+
+if ($Mirror -ne $true) {
+
+	Write-Host "No available port mirror found. I quit!"
 }
 
 ## Need to add message if there are no mirroring ports are available.
