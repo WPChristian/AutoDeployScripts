@@ -97,8 +97,47 @@ $WANPortgroup = Get-VDPortgroup -Name "Switch-Holder"
 $Switchholder = Get-VM -Name Switch-Holder
 $HoldAdapters = Get-NetworkAdapter -VM $Switchholder
 
-# Get the user's name and create a unique ID
+# Get the user's name and create a unique ID and folder for devices
+
+$ID = Get-Random -Minimum 99 -Maximum 999
+
+$RootFolder = Get-Folder -Name NAC-Test-Env-Clean
+
 $Owner = Read-Host "Please enter your first initial and last name without spaces"
+
+# Select the version of NAC to install on the devices
+
+$NACCMTemplates = $RootFolder |Get-Folder -Name _TEMPLATES_ | Get-Folder -Name NAC | Get-Template -Name _TEMPLATE_-naccm*
+
+$TemplateNumber = 1
+
+foreach ($NACCMTemplate in $NACCMTemplates) {
+
+    Write-Host "$TemplateNumber) $NACCMTemplate"
+    $TemplateNumber++
+    
+}
+
+$CMTemplateNum = Read-Host "Please select the NAC CM template that you would like to use`n"
+
+$NACSnsrTemplates = $RootFolder |Get-Folder -Name _TEMPLATES_ | Get-Folder -Name NAC | Get-Template -Name _TEMPLATE_-nacsnsr*
+
+$TemplateNumber = 1
+
+foreach ($NACSnsrTemplate in $NACSnsrTemplates) {
+
+    Write-Host "$TemplateNumber) $NACSnsrTemplate"
+    $TemplateNumber++
+    
+}
+
+$SensorTemplateNum = Read-Host "Please select the NAC Sensor template that you would like to use`n"
+
+$CMTemplate = $NACCMTemplates[$CMTemplateNum - 1]
+$SensorTemplate = $NACSnsrTemplates[$SensorTemplateNum - 1]
+
+
+
 
 # Set the amount of clients to deploy
 
@@ -109,10 +148,6 @@ while($Win7Count -gt $MaxDevices){
 	[int]$Win7Count = Read-Host "Please enter a number less than $MaxDevices"
 }
 
-$ID = Get-Random -Minimum 99 -Maximum 999
-
-$RootFolder = Get-Folder -Name NAC-Test-Env-Clean
-
 Write-Host "Creating your environment folder...`n"
 
 $EnvFolder = $RootFolder | New-Folder -Name "$Owner-$ID"
@@ -122,8 +157,8 @@ Write-Host "Successfully created your folder: $EnvFolder`n"
 
 
 ## Define VM Names and Templates to Use
-$SensorName = ($SensorTemplate = Get-Template -Name _TEMPLATE_-nacsnsr-4.3) -replace "_TEMPLATE_", "$Owner-$ID"
-$CMName = ($CMTemplate = Get-Template -Name _TEMPLATE_-naccm-4.3) -replace "_TEMPLATE_", "$Owner-$ID"
+$SensorName = ($SensorTemplate) -replace "_TEMPLATE_", "$Owner-$ID"
+$CMName = ($CMTemplate) -replace "_TEMPLATE_", "$Owner-$ID"
 $WinCientName = ($WinTemplate = Get-Template -Name _TEMPLATE_-win7-x64-client) -replace "_TEMPLATE_", "$Owner-$ID"
 $RouterName = ($RouterTemplate = Get-Template -Name _TEMPLATE_-centos64_x64-router) -replace "_TEMPLATE_", "$Owner-$ID"
 
