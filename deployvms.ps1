@@ -92,7 +92,7 @@ $VDSwitch = Get-VDSwitch -Name Test-Env-VDSwitch
 $HoldPortgroup = Get-VDPortgroup -Name "Switch-Holder"
 
 # WAN Network Adapter for router to use
-$WANPortgroup = Get-VDPortgroup -Name "Switch-Holder"
+$WANPortgroup = Get-VirtualPortGroup -Name "10.50.11.0/24"
 
 $Switchholder = Get-VM -Name Switch-Holder
 $HoldAdapters = Get-NetworkAdapter -VM $Switchholder
