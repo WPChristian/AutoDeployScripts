@@ -276,17 +276,20 @@ foreach ($HoldAdapter in $HoldAdapters){
 
 		Write-Host "Your environment's folder name is: $EnvFolder"
 
-		$RouterIP = 0
+		Write-Host "Getting environment IP information... `n"
 
-		while ($RouterIP = 0 ){
-			$RouterIP = [string]$Router.guest.IPAddress[0]
-			Write-Host "Your gateway device is located at: " 
-			Write-Host $RouterIP
-			Write-Host "CM Address is at: http://" $RouterIP
-			Write-Host "SSH connectivity to gateway router is at: " $RouterIP ":22"
-			Write-Host "SSH connectivity to CM is at: " $RouterIP ":23"
-			Write-Host "SSH connectivity to Sensor is at: " $RouterIP ":24"
+		while (!$RouterIP){
+			$Router = Get-VM -Name $RouterName
+			$RouterIP = [string]$Router.guest.IPAddress[0]			
 		}
+
+		Write-Host "Your gateway device is located at: $RouterIP" 
+		Write-Host "CM Address is at: https://$RouterIP" 
+		Write-Host "SSH connectivity to gateway router is at: $RouterIP Port: 22"
+		Write-Host "SSH connectivity to CM is at: $RouterIP Port: 23"
+		Write-Host "SSH connectivity to Sensor is at: $RouterIP Port: 24"
+
+		Write-Host "`n`n`n DONE!! "
 		
 		break
 		
@@ -302,4 +305,3 @@ if ($Mirror -ne $true) {
 ## Need to add message if there are no mirroring ports are available.
 
 
-Disconnect-VIServer -Server $VCenterHost
